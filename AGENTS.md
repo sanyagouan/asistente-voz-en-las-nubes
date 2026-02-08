@@ -112,7 +112,7 @@ async def process_message(self, input_text):
 ### 1. RouterAgent
 
 **Modelo:** `gpt-4o-mini` (bajo costo, alta velocidad)  
-**Ubicación:** `src/core/agents/router_agent.py`
+**Ubicación:** `src/application/agents/router_agent.py`
 
 #### Responsabilidades
 
@@ -179,7 +179,7 @@ REGLAS:
 ### 2. LogicAgent
 
 **Modelo:** `deepseek-chat` (razonamiento profundo, bajo costo)  
-**Ubicación:** `src/core/agents/logic_agent.py`
+**Ubicación:** `src/application/agents/logic_agent.py`
 
 #### Responsabilidades
 
@@ -264,7 +264,7 @@ class ReservationState(str, Enum):
 ### 3. HumanAgent
 
 **Modelo:** `gpt-4o` (máxima calidad de lenguaje natural)  
-**Ubicación:** `src/core/agents/human_agent.py`
+**Ubicación:** `src/application/agents/human_agent.py`
 
 #### Responsabilidades
 
@@ -397,13 +397,13 @@ cuentas mejor qué necesitáis."
 | Día | Comidas | Cenas |
 |-----|---------|-------|
 | **Lunes** | ❌ Cerrado | ❌ Cerrado |
-| **Martes - Viernes** | 12:00 - 16:00 | 20:00 - 23:00 |
-| **Sábado** | 12:00 - 16:00 | 20:00 - 00:00 |
-| **Domingo** | 12:00 - 16:00 | 20:00 - 23:00 |
+| **Martes - Viernes** | 13:00 - 17:00 | 20:00 - 23:00 |
+| **Sábado** | 13:00 - 17:00 | 20:00 - 00:00 |
+| **Domingo** | 13:00 - 17:00 | 20:00 - 23:00 |
 
 **Excepciones:**
 - **Festivos:** Si lunes es festivo → Abierto (cierra el martes)
-- **Menú del día:** Solo martes-viernes mediodía
+- **Menú del día:** Solo martes-viernes mediodía (13:00-17:00)
 
 #### Avisos Especiales
 
@@ -693,6 +693,104 @@ for mesa in mesas:
    if count > 10:
        return {"error": "Demasiadas llamadas, intenta en 1h"}
    ```
+
+### 5. Supabase (Backend & Auth)
+
+**Ubicación:** Configurado en MCP `supabase-mcp-server`  
+**Credenciales:** Ver `.env.mcp` (SUPABASE_URL, SUPABASE_ACCESS_TOKEN)
+
+**Uso en el Proyecto:**
+
+1. **Backend as a Service:**
+   - Base de datos PostgreSQL gestionada
+   - APIs REST auto-generadas
+   - Real-time subscriptions
+
+2. **Autenticación:**
+   - Sistema de usuarios (si se implementa login de staff)
+   - Row Level Security (RLS) para proteger datos
+   - JWT tokens para autorización
+
+3. **Storage:**
+   - Almacenamiento de archivos (menús PDF, imágenes)
+   - URLs públicas con CDN
+
+**Conexión desde Python:**
+```python
+from supabase import create_client
+
+supabase = create_client(
+    supabase_url=os.getenv("SUPABASE_URL"),
+    supabase_key=os.getenv("SUPABASE_ACCESS_TOKEN")
+)
+
+# Query ejemplo
+reservas = supabase.table("reservas").select("*").eq("estado", "Confirmada").execute()
+```
+
+**Integración con Airtable:**
+- Airtable es la base de datos principal operativa
+- Supabase se usa para analytics y reportes históricos
+- Sincronización: Pendiente de implementar
+
+### 6. Coolify (Deployment VPS)
+
+**Panel:** https://coolify.tu-servidor.com (configurar URL real)  
+**API:** Configurada en MCP `coolify`  
+**Credenciales:** Ver `.env.mcp` (COOLIFY_API_URL, COOLIFY_API_TOKEN)
+
+**Stack Desplegado:**
+
+1. **Aplicación Principal (FastAPI):**
+   - Dockerfile multi-stage
+   - Puerto: 8000
+   - Health check: `/health`
+   - Auto-restart en fallos
+
+2. **Redis:**
+   - Imagen oficial: `redis:7-alpine`
+   - Puerto: 6379
+   - Persistencia: AOF habilitado
+   - Networking interno con FastAPI
+
+3. **Variables de Entorno:**
+   ```bash
+   # Configuradas en Coolify UI
+   AIRTABLE_API_KEY=***
+   TWILIO_ACCOUNT_SID=***
+   TWILIO_AUTH_TOKEN=***
+   TWILIO_FROM_NUMBER=***
+   OPENAI_API_KEY=***
+   DEEPSEEK_API_KEY=***
+   REDIS_HOST=redis  # Nombre del servicio en Docker
+   REDIS_PORT=6379
+   ```
+
+4. **Dominio y SSL:**
+   - Dominio: configurar en Coolify
+   - SSL: Let's Encrypt automático
+   - Reverse proxy: Caddy (incluido en Coolify)
+
+**Comandos Útiles (vía MCP Coolify):**
+
+```python
+# Ver estado de servicios
+mcp_coolify_get_services()
+
+# Ver logs en tiempo real
+mcp_coolify_get_logs(service_id="asistente-voz", lines=100)
+
+# Reiniciar servicio
+mcp_coolify_restart_service(service_id="asistente-voz")
+
+# Deploy nuevo commit
+mcp_coolify_deploy(service_id="asistente-voz", branch="main")
+```
+
+**CI/CD Pipeline:**
+- Push a GitHub → Webhook a Coolify → Build automático → Deploy
+- Health check antes de promover nueva versión
+- Rollback automático si health check falla
 
 ---
 
