@@ -1,4 +1,5 @@
 import json
+import os  # FIXED: faltaba para os.getenv()
 import zlib
 import time
 from typing import Optional, Any, Dict, List
